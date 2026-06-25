@@ -2,9 +2,11 @@ def gv
 
 pipeline {   
     agent any
+
     tools {
         maven 'maven-3.9'
     }
+
     stages {
         
         stage("build jar") {
@@ -12,7 +14,6 @@ pipeline {
                 script {
                     echo "packaging the application..."
                     sh 'mvn package'
-
                 }
             }
         }
@@ -21,9 +22,9 @@ pipeline {
             steps {
                 script {
                     echo "building the docker image..."
-                    withCredentials ([usernamePassword(credentialsId: 'docker-hub-repo', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub-repo', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
                         sh "docker build -t mujuules01/demo-app:jma-2.0 ."
-                        sh "echo $PASS | docker login -u $USER --password-stdin"
+                        sh 'echo $PASS | docker login -u $USER --password-stdin'
                         sh 'docker push mujuules01/demo-app:jma-2.0'
                     }
                 }
@@ -33,9 +34,9 @@ pipeline {
         stage("deploy") {
             steps {
                 script {
-                    gv.deployApp()
+                    echo "deploying the application..."
                 }
             }
         }               
     }
-} 
+}
