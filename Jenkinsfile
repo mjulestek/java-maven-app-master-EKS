@@ -6,7 +6,7 @@ pipeline {
             steps {
                 script {
                     echo "Testing the application...."
-                    echo "executing pipeline for branch $BRANCH_NAME"
+                    echo "executing pipeline for branch ${BRANCH_NAME}"
                 }
             }
         }
@@ -14,7 +14,7 @@ pipeline {
         stage("build") {
             when {
                 expression { 
-                    BRANCH_NAME== 'main'
+                    BRANCH_NAME == 'main'
                 }
             }
             steps {
@@ -27,8 +27,9 @@ pipeline {
         stage("deploy") {
             when {
                 expression { 
-                    BRANCH_NAME== 'main'
-                }            
+                    BRANCH_NAME == 'main'
+                }
+            }
             steps {
                 script {
                     echo "Deploying the application...."
