@@ -1,38 +1,53 @@
+def gv
+
 pipeline {
     agent any
 
+    tools {
+        maven 'Maven'
+    }
+
     stages {
-        stage("test") {
+        stage('increment version') {
             steps {
                 script {
-                    echo "Testing the application...."
-                    echo "executing pipeline for branch ${BRANCH_NAME}"
+                    echo 'incrementing the version...'
+                    sh 'mvn build-helper:parse-version versions:\
+                    set -DnewVersion=\${parsedVersion.nextMajorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.nextIncrementalVersion} \
+                    versions:commit'
+
+                    def matcher = readFile('pom.xml') =~ '<version>(.+)</version>'
+                    def version =matcher[0][1]
+                    env.IMAGE_NAME = "$version-$BUILD_NUMBER"
+                }
+            }
+        }
+        stage('build app') {
+            steps {
+                script {
+                    echo 'building the application...'
+                    sh 'mvn clean package'
                 }
             }
         }
 
-        stage("build") {
-            when {
-                expression { 
-                    BRANCH_NAME == 'main'
-                }
-            }
+        stage('build image') {
             steps {
                 script {
-                    echo "Building the application...."
+                    echo 'building the docker image...'
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub-repo', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                        sh "docker build -t mujuules01/demo-app:${IMAGE_NAME} ."
+                        sh 'echo $PASS | docker login -u $USER --password-stdin'
+                        sh "docker push mujuules01/demo-app:${IMAGE_NAME}"
+                    }
                 }
             }
         }
 
-        stage("deploy") {
-            when {
-                expression { 
-                    BRANCH_NAME == 'main'
-                }
-            }
+        stage('deploy') {
             steps {
                 script {
-                    echo "Deploying the application...."
+                    echo 'deploying the application...'
                 }
             }
         }
