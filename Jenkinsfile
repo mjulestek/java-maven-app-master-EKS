@@ -1,4 +1,4 @@
-def gv
+#!/usr/bin/env groovy
 
 pipeline {
     agent any
@@ -12,21 +12,16 @@ pipeline {
             steps {
                 script {
                     echo 'incrementing the version...'
-                    sh 'mvn build-helper:parse-version versions:\
-                    set -DnewVersion=\${parsedVersion.nextMajorVersion}.\${parsedVersion.nextMinorVersion}.\${parsedVersion.nextIncrementalVersion} \
-                    versions:commit'
-
-                    def matcher = readFile('pom.xml') =~ '<version>(.+)</version>'
-                    def version =matcher[0][1]
-                    env.IMAGE_NAME = "$version-$BUILD_NUMBER"
+                    sh 'mvn build-helper:parse-version versions:set -DnewVersion=\\${parsedVersion.majorVersion}.\\${parsedVersion.minorVersion}.\\${parsedVersion.nextIncrementalVersion} versions:commit'
                 }
             }
         }
+
         stage('build app') {
             steps {
                 script {
                     echo 'building the application...'
-                    sh 'mvn clean package'
+                    sh 'mvn package'
                 }
             }
         }
@@ -36,9 +31,9 @@ pipeline {
                 script {
                     echo 'building the docker image...'
                     withCredentials([usernamePassword(credentialsId: 'docker-hub-repo', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
-                        sh "docker build -t mujuules01/demo-app:${IMAGE_NAME} ."
+                        sh 'docker build -t mujuules01/demo-app:jma-4.0 .'
                         sh 'echo $PASS | docker login -u $USER --password-stdin'
-                        sh "docker push mujuules01/demo-app:${IMAGE_NAME}"
+                        sh 'docker push mujuules01/demo-app:jma-4.0'
                     }
                 }
             }
