@@ -50,7 +50,7 @@ pipeline {
             steps {
                 script {
                     echo 'commit version update to git repo...'
-                    withCredentials([usernamePassword(credentialsId: 'docker-hub-repo', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                    withCredentials([usernamePassword(credentialsId: 'github-credentials', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
                         sh 'git config --global user.email "mjules.tek@gmail.com"'
                         sh 'git config --global user.name "mjules.tek"'
 
