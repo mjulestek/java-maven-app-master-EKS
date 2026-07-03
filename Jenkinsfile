@@ -46,5 +46,25 @@ pipeline {
                 }
             }
         }
+        stage('commit version update to git repo') {
+            steps {
+                script {
+                    echo 'commit version update to git repo...'
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub-repo', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                        sh 'git config --global user.email "mjules.tek@gmail.com"'
+                        sh 'git config --global user.name "mjules.tek"'
+
+                        sh 'git status'
+                        sh 'git branch'
+                        sh 'git config --list'
+                        sh 'git remote set-url origin https://$USER:$PASS@github.com/mjulestek/java-maven-app-master-EKS.git'
+                        sh 'git add .'
+                        sh 'git commit -m "jenkins increment version"'
+                        sh 'git push origin HEAD:jenkins-jobs'  
+                    }
+                }
+            }
+        }
+
     }
 }
