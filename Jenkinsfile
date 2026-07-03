@@ -75,15 +75,8 @@ pipeline {
                         sh 'git remote -v'
 
                         sh 'git add .'
-
-                        sh '''
-                            if git diff --cached --quiet; then
-                                echo "No changes to commit"
-                            else
-                                git commit -m "jenkins increment version"
-                                git push origin HEAD:$GIT_BRANCH_TO_PUSH
-                            fi
-                        '''
+                        sh 'git commit -m "jenkins increment version [skip ci]" || true'
+                        sh 'git push origin HEAD:$GIT_BRANCH_TO_PUSH'
                     }
                 }
             }
