@@ -65,8 +65,8 @@ pipeline {
                 script {
                     echo 'commit version update to git repo...'
                     withCredentials([usernamePassword(credentialsId: 'github-credentials', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USER')]) {
-                        sh 'git config --global user.email "mjules.tek@gmail.com"'
-                        sh 'git config --global user.name "mjules.tek"'
+                        sh 'git config --global user.email "jenkins@example.com"'
+                        sh 'git config --global user.name "jenkins"'
 
                         sh 'git status'
                         sh 'git branch'
