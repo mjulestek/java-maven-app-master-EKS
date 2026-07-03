@@ -57,7 +57,7 @@ pipeline {
                         sh 'git status'
                         sh 'git branch'
                         sh 'git config --list'
-                        sh 'git remote set-url origin https://$USER:$PASS@github.com/mjulestek/java-maven-app-master-EKS.git'
+                        sh 'git remote set-url origin https://$USER:$PASS@github.com/$USER/java-maven-app-master-EKS.git'
                         sh 'git add .'
                         sh 'git commit -m "jenkins increment version"'
                         sh 'git push origin HEAD:jenkins-jobs'  
