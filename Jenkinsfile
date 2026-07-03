@@ -70,9 +70,9 @@ pipeline {
 
                         sh 'git status'
                         sh 'git branch'
-                        sh 'git config --list'
 
                         sh 'git remote set-url origin https://$GITHUB_USER:$GITHUB_TOKEN@github.com/$GITHUB_REPO_OWNER/$GITHUB_REPO.git'
+                        sh 'git remote -v'
 
                         sh 'git add .'
 
