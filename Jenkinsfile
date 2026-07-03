@@ -64,7 +64,7 @@ pipeline {
             steps {
                 script {
                     echo 'commit version update to git repo...'
-                    withCredentials([usernamePassword(credentialsId: 'github-credentials', passwordVariable: 'GITHUB_PASS', usernameVariable: 'GITHUB_USER')]) {
+                    withCredentials([usernamePassword(credentialsId: 'github-credentials', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USER')]) {
                         sh 'git config --global user.email "mjules.tek@gmail.com"'
                         sh 'git config --global user.name "mjules.tek"'
 
@@ -72,7 +72,7 @@ pipeline {
                         sh 'git branch'
                         sh 'git config --list'
 
-                        sh 'git remote set-url origin https://$GITHUB_USER:$GITHUB_PASS@github.com/mjulestek/java-maven-app-master-EKS.git'
+                        sh 'git remote set-url origin https://$GITHUB_USER:$GITHUB_TOKEN@github.com/$GITHUB_REPO_OWNER/$GITHUB_REPO.git'
 
                         sh 'git add .'
 
