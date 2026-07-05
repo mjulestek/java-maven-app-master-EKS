@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Senior DevOps runbook for deploying a Java Maven Docker application from Jenkins Multibranch Pipeline to AWS EKS using kubectl, AWS CLI, Docker Hub or ECR, and Kubernetes manifests." />
+  <title>Jenkins to EKS CD Pipeline Runbook</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #020617;
+      --bg-2: #030712;
+      --panel: rgba(15, 23, 42, 0.84);
+      --border: rgba(148, 163, 184, 0.18);
+      --border-strong: rgba(34, 211, 238, 0.36);
+      --text: #f8fafc;
+      --text-2: #dbeafe;
+      --muted: #94a3b8;
+      --cyan: #22d3ee;
+      --blue: #38bdf8;
+      --violet: #8b5cf6;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --shadow: 0 30px 100px rgba(0, 0, 0, .42);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow-x: hidden;
+      font-family: var(--sans);
+      color: var(--text);
+      background:
+        radial-gradient(circle at 10% 4%, rgba(34,211,238,.18), transparent 24%),
+        radial-gradient(circle at 92% 8%, rgba(139,92,246,.16), transparent 28%),
+        radial-gradient(circle at 70% 92%, rgba(56,189,248,.12), transparent 26%),
+        linear-gradient(135deg, var(--bg), var(--bg-2) 48%, #07111f);
+      line-height: 1.58;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: -1;
+      background-image:
+        linear-gradient(rgba(148, 163, 184, .055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, .055) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(to bottom, black 0%, transparent 80%);
+    }
+
+    a { color: inherit; }
+    p { color: var(--muted); margin: .55rem 0 0; }
+    strong { color: var(--text); }
+    code, pre { font-family: var(--mono); }
+
+    .wrap { max-width: 1440px; margin: 0 auto; padding: 20px; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      margin: -20px -20px 18px;
+      padding: 12px 20px;
+      background: rgba(2, 6, 23, .84);
+      backdrop-filter: blur(18px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .topbar-inner {
+      max-width: 1440px;
+      margin: auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      font-weight: 900;
+      letter-spacing: -.03em;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      border-radius: 15px;
+      display: grid;
+      place-items: center;
+      color: #001018;
+      background: linear-gradient(135deg, var(--cyan), var(--blue), var(--violet));
+      flex: 0 0 auto;
+    }
+
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .btn {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 9px 13px;
+      border-radius: 15px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, .75);
+      color: var(--text);
+      text-decoration: none;
+      font-size: .88rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform .16s ease, border-color .16s ease;
+    }
+
+    .btn:hover, .btn:focus-visible {
+      transform: translateY(-1px);
+      border-color: var(--border-strong);
+      outline: none;
+    }
+
+    .btn.primary {
+      background: linear-gradient(135deg, var(--cyan), var(--blue));
+      color: #001018;
+      border-color: transparent;
+      box-shadow: 0 14px 40px rgba(34, 211, 238, .16);
+    }
+
+    .hero {
+      border: 1px solid var(--border);
+      border-radius: 34px;
+      padding: clamp(28px, 5vw, 56px);
+      background:
+        linear-gradient(135deg, rgba(15,23,42,.94), rgba(15,23,42,.64)),
+        radial-gradient(circle at 82% 16%, rgba(34,211,238,.18), transparent 30%);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 420px;
+      height: 420px;
+      right: -160px;
+      top: -190px;
+      background: conic-gradient(from 120deg, var(--cyan), var(--violet), var(--blue), var(--cyan));
+      opacity: .42;
+      filter: blur(58px);
+      border-radius: 999px;
+    }
+
+    .hero-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 28px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(34,211,238,.34);
+      background: rgba(34,211,238,.08);
+      color: #cffafe;
+      font-size: .76rem;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 18px 0 0;
+      font-size: clamp(2.15rem, 6vw, 5rem);
+      line-height: .95;
+      letter-spacing: -.075em;
+      font-weight: 950;
+    }
+
+    .gradient {
+      background: linear-gradient(90deg, #67e8f9, #38bdf8, #8b5cf6);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .lead {
+      color: var(--text-2);
+      max-width: 840px;
+      font-size: clamp(1rem, 1.6vw, 1.15rem);
+    }
+
+    .quick-route {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(148,163,184,.08);
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      font-size: .84rem;
+      font-weight: 800;
+    }
+
+    .hero-cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .mini-card {
+      padding: 15px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: rgba(2,6,23,.38);
+    }
+
+    .mini-card b { display:block; color: #e0f2fe; font-size: 1.05rem; }
+    .mini-card span { display:block; color: var(--muted); font-size: .82rem; margin-top: 3px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 330px minmax(0,1fr);
+      gap: 22px;
+      align-items: start;
+      margin-top: 22px;
+    }
+
+    .toc {
+      position: sticky;
+      top: 76px;
+      max-height: calc(100vh - 96px);
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 26px;
+      padding: 15px;
+      background: rgba(15,23,42,.76);
+      backdrop-filter: blur(18px);
+    }
+
+    .toc h2 {
+      margin: 0 0 10px;
+      font-size: .78rem;
+      color: #e0f2fe;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+    }
+
+    .toc a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: var(--muted);
+      padding: 7px 9px;
+      border-radius: 12px;
+      font-size: .84rem;
+      font-weight: 750;
+    }
+
+    .toc a:hover, .toc a:focus-visible {
+      color: var(--text);
+      background: rgba(148,163,184,.10);
+      outline: none;
+    }
+
+    main { min-width: 0; }
+
+    .section {
+      margin-bottom: 18px;
+      padding: clamp(18px, 3vw, 28px);
+      border: 1px solid var(--border);
+      border-radius: 32px;
+      background: var(--panel);
+      box-shadow: 0 18px 60px rgba(0,0,0,.18);
+      backdrop-filter: blur(16px);
+      scroll-margin-top: 90px;
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 13px;
+      align-items: start;
+      margin-bottom: 14px;
+    }
+
+    .icon {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      border-radius: 17px;
+      border: 1px solid var(--border);
+      background: linear-gradient(135deg, rgba(34,211,238,.16), rgba(139,92,246,.14));
+      color: var(--cyan);
+      font-weight: 950;
+    }
+
+    .step-kicker {
+      color: var(--cyan);
+      font-size: .76rem;
+      text-transform: uppercase;
+      letter-spacing: .13em;
+      font-weight: 950;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: clamp(1.35rem, 3vw, 2rem);
+      line-height: 1.08;
+      letter-spacing: -.045em;
+    }
+
+    h3 { color: #e0f2fe; margin: 1rem 0 .35rem; font-size: 1.02rem; }
+    h4 { color: var(--text); margin: .9rem 0 .25rem; font-size: .94rem; }
+
+    ul, ol { color: var(--muted); padding-left: 1.25rem; margin: .55rem 0 0; }
+    li { margin: .35rem 0; }
+
+    .cards, .checks, .two-col, .steps-grid {
+      display: grid;
+      gap: 12px;
+      margin-top: 13px;
+    }
+
+    .cards { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+    .two-col { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .steps-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .checks { grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)); }
+
+    .card, .check, .substep {
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 14px;
+      background: rgba(51,65,85,.30);
+    }
+
+    .card h3, .substep h3 { margin-top: 0; }
+
+    .badge {
+      display: inline-flex;
+      align-items:center;
+      gap: 6px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(34,211,238,.09);
+      border: 1px solid rgba(34,211,238,.24);
+      color: #cffafe;
+      font-size: .75rem;
+      font-weight: 900;
+    }
+
+    .badge.green {
+      background: rgba(34,197,94,.10);
+      border-color: rgba(34,197,94,.28);
+      color: #dcfce7;
+    }
+
+    .badge.warn {
+      background: rgba(245,158,11,.10);
+      border-color: rgba(245,158,11,.30);
+      color: #fef3c7;
+    }
+
+    .check {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      color: var(--muted);
+    }
+
+    .check::before {
+      content: "✓";
+      color: var(--green);
+      font-weight: 950;
+    }
+
+    .callout {
+      margin-top: 12px;
+      padding: 13px 15px;
+      border-radius: 18px;
+      border: 1px solid rgba(34,211,238,.25);
+      background: rgba(34,211,238,.075);
+      color: #dffbff;
+    }
+
+    .callout.success { border-color: rgba(34,197,94,.30); background: rgba(34,197,94,.075); color: #dcfce7; }
+    .callout.warn { border-color: rgba(245,158,11,.32); background: rgba(245,158,11,.085); color: #fef3c7; }
+    .callout.danger { border-color: rgba(239,68,68,.34); background: rgba(239,68,68,.075); color: #fee2e2; }
+    .callout.violet { border-color: rgba(139,92,246,.32); background: rgba(139,92,246,.085); color: #ede9fe; }
+
+    code.inline {
+      padding: 2px 7px;
+      border: 1px solid rgba(34,211,238,.22);
+      border-radius: 8px;
+      background: rgba(34,211,238,.08);
+      color: #cffafe;
+      white-space: nowrap;
+    }
+
+    .cmd {
+      margin-top: 12px;
+      border: 1px solid rgba(148,163,184,.18);
+      border-radius: 20px;
+      overflow: hidden;
+      background: rgba(2,6,23,.88);
+    }
+
+    .cmd-head {
+      display:flex;
+      justify-content: space-between;
+      align-items:center;
+      gap: 8px;
+      padding: 9px 11px;
+      background: rgba(148,163,184,.08);
+      border-bottom: 1px solid rgba(148,163,184,.13);
+    }
+
+    .cmd-label {
+      color: var(--text-2);
+      font-size: .78rem;
+      font-weight: 900;
+    }
+
+    .copy {
+      border: 1px solid rgba(148,163,184,.20);
+      background: rgba(15,23,42,.9);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 6px 9px;
+      font-weight: 850;
+      cursor: pointer;
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px;
+      overflow-x: auto;
+      max-width: 100%;
+      -webkit-overflow-scrolling: touch;
+      color: #cffafe;
+      line-height: 1.55;
+      font-size: .84rem;
+    }
+
+    pre code { white-space: pre; }
+
+    .table-wrap {
+      margin-top: 12px;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+    }
+
+    table { width: 100%; min-width: 800px; border-collapse: collapse; }
+    th, td {
+      padding: 12px 13px;
+      text-align:left;
+      vertical-align: top;
+      border-bottom: 1px solid rgba(148,163,184,.14);
+      color: var(--muted);
+    }
+    th {
+      color: var(--text);
+      background: rgba(148,163,184,.08);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      font-size: .78rem;
+    }
+    td:first-child { color: #e0f2fe; font-weight: 850; }
+    tr:last-child td { border-bottom: 0; }
+
+    .flowline {
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-top:12px;
+    }
+
+    .flowline span {
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background: rgba(148,163,184,.08);
+      color: var(--text-2);
+      font-weight:850;
+      font-size:.84rem;
+    }
+
+    .footer {
+      text-align:center;
+      margin-top: 20px;
+      padding: 28px;
+      border-radius: 28px;
+      border: 1px solid var(--border);
+      background: rgba(15,23,42,.70);
+      color: var(--muted);
+    }
+
+    @media (max-width: 1024px) {
+      .hero-grid, .layout { grid-template-columns: 1fr; }
+      .toc { position: relative; top: 0; max-height:none; }
+      .toc nav { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 3px; }
+    }
+
+    @media (max-width: 768px) {
+      .wrap { padding: 14px; }
+      .topbar { margin: -14px -14px 14px; padding: 10px 14px; }
+      .topbar-inner { flex-direction: column; align-items: stretch; }
+      .actions .btn { flex: 1 1 auto; }
+      .hero { border-radius: 26px; padding: 22px; }
+      h1 { font-size: clamp(2rem, 12vw, 2.7rem); letter-spacing: -.055em; }
+      .hero-cards, .two-col, .cards, .checks, .steps-grid { grid-template-columns: 1fr; }
+      .section { border-radius: 24px; padding: 18px; }
+      .section-head { grid-template-columns: 1fr; gap: 9px; }
+      .icon { width: 42px; height: 42px; }
+      table { min-width: 720px; }
+    }
+
+    @media (max-width: 480px) {
+      body { font-size: 15px; }
+      .wrap { padding: 12px; }
+      .topbar { margin: -12px -12px 12px; padding: 10px 12px; }
+      .hero { padding: 18px; }
+      .lead { font-size: .96rem; }
+      .btn { width: 100%; }
+      .quick-route .chip, .flowline span { width: 100%; justify-content: center; }
+      .toc nav { grid-template-columns: 1fr; }
+      pre { font-size: .76rem; padding: 12px; }
+      .section { padding: 15px; }
+    }
+
+    @media print {
+      :root { color-scheme: light; }
+      body { background:#fff; color:#111827; }
+      body::before, .topbar, .toc, .copy { display:none !important; }
+      .wrap { max-width: none; padding:0; }
+      .layout, .hero-grid { display:block; }
+      .hero, .section, .card, .check, .cmd, .table-wrap, .footer {
+        box-shadow:none;
+        background:#fff;
+        border-color:#d1d5db;
+        break-inside: avoid;
+      }
+      h1,h2,h3,strong,th,td:first-child { color:#111827; }
+      p,li,td { color:#374151; }
+      .gradient { color:#111827; background:none; }
+      pre { background:#111827; color:#e5e7eb; white-space: pre-wrap; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand"><span class="brand-mark">☸</span><span>Jenkins to EKS CD Pipeline Runbook</span></div>
+      <div class="actions">
+        <a class="btn" href="#tools">Tools</a>
+        <a class="btn" href="#manifests">K8s YAML</a>
+        <a class="btn" href="#jenkinsfile-dockerhub">Jenkinsfile</a>
+        <button class="btn primary" type="button" onclick="window.print()">Print / PDF</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero" id="start">
+    <div class="hero-grid">
+      <div>
+        <span class="eyebrow">Module 11 · Kubernetes on AWS EKS</span>
+        <h1>Deploy to <span class="gradient">EKS from Jenkins Pipeline</span>.</h1>
+        <p class="lead">This runbook extends your working Jenkins CI pipeline into a full CD pipeline. Jenkins will build a Java Maven app, push a Docker image, connect to an EKS cluster using AWS CLI + kubectl, and deploy the new image to Kubernetes.</p>
+        <div class="quick-route">
+          <span class="chip">Jenkins</span><span class="chip">AWS CLI</span><span class="chip">kubectl</span><span class="chip">EKS</span><span class="chip">Docker Hub</span><span class="chip">ECR Option</span><span class="chip">K8s Manifests</span>
+        </div>
+      </div>
+      <div class="hero-cards">
+        <div class="mini-card"><b>CI stage</b><span>Version → Maven package → Docker image.</span></div>
+        <div class="mini-card"><b>CD stage</b><span>kubectl deploys the new image to EKS.</span></div>
+        <div class="mini-card"><b>Auth</b><span>AWS credentials create kubeconfig dynamically.</span></div>
+        <div class="mini-card"><b>Goal</b><span>Push to GitHub → Jenkins deploys to Kubernetes.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="layout">
+    <aside class="toc" aria-label="Table of contents">
+      <h2>Runbook Order</h2>
+      <nav>
+        <a href="#goal">00 Target Flow</a>
+        <a href="#architecture">01 Architecture</a>
+        <a href="#prerequisites">02 Prerequisites</a>
+        <a href="#eks">03 EKS Cluster</a>
+        <a href="#iam">04 IAM Access</a>
+        <a href="#tools">05 Jenkins Tools</a>
+        <a href="#credentials">06 Jenkins Credentials</a>
+        <a href="#manual-test">07 Manual Test</a>
+        <a href="#repo-structure">08 Repo Structure</a>
+        <a href="#manifests">09 Kubernetes YAML</a>
+        <a href="#dockerhub-private">10 Private Docker Hub</a>
+        <a href="#jenkinsfile-dockerhub">11 Jenkinsfile · Docker Hub</a>
+        <a href="#ecr-option">12 ECR Option</a>
+        <a href="#test">13 Test Deployment</a>
+        <a href="#verify">14 Verify in Kubernetes</a>
+        <a href="#troubleshooting">15 Troubleshooting</a>
+        <a href="#cleanup">16 Cleanup</a>
+        <a href="#rules">17 Rules of Thumb</a>
+      </nav>
+    </aside>
+
+    <main>
+      <section class="section" id="goal">
+        <div class="section-head"><div class="icon">00</div><div><div class="step-kicker">Final target</div><h2>What This Demo Should Achieve</h2><p>Your current Jenkins CI pipeline already builds and pushes Docker images. This demo adds the Kubernetes deployment part.</p></div></div>
+        <div class="flowline">
+          <span>Git push</span><span>Jenkins</span><span>Maven build</span><span>Docker push</span><span>kubectl</span><span>EKS deployment</span><span>rollout status</span>
+        </div>
+        <div class="callout success"><strong>Definition of done:</strong> after a Git push, Jenkins builds a new image, pushes it to a registry, updates the Kubernetes Deployment image, and the EKS pods roll out successfully.</div>
+      </section>
+
+      <section class="section" id="architecture">
+        <div class="section-head"><div class="icon">01</div><div><div class="step-kicker">Mental model</div><h2>Architecture Overview</h2><p>Jenkins does not deploy magically. It simply runs the same commands a DevOps engineer would run manually: AWS CLI creates kubeconfig, then kubectl talks to the EKS API server.</p></div></div>
+        <div class="cards">
+          <div class="card"><h3>GitHub</h3><p>Stores the application source code, Jenkinsfile, Dockerfile, and Kubernetes manifest files.</p></div>
+          <div class="card"><h3>Jenkins</h3><p>Runs the CI/CD pipeline after GitHub webhook triggers the Multibranch job.</p></div>
+          <div class="card"><h3>Docker Registry</h3><p>Stores the built Docker image. You can use Docker Hub first, then AWS ECR later.</p></div>
+          <div class="card"><h3>Amazon EKS</h3><p>Runs the Kubernetes cluster. Jenkins deploys to it using kubectl.</p></div>
+        </div>
+      </section>
+
+      <section class="section" id="prerequisites">
+        <div class="section-head"><div class="icon">02</div><div><div class="step-kicker">Before starting</div><h2>Prerequisites Checklist</h2><p>Do not start the Jenkinsfile changes until these basics are ready.</p></div></div>
+        <div class="checks">
+          <div class="check">Your previous Jenkins Multibranch Pipeline is already working.</div>
+          <div class="check">Jenkins can build the Maven app and push Docker image.</div>
+          <div class="check">An EKS cluster exists with worker nodes.</div>
+          <div class="check">You know your AWS region, cluster name, and AWS account ID.</div>
+          <div class="check">You can access the EKS cluster from your local machine or AWS CLI.</div>
+          <div class="check">Your repo has a Dockerfile and Jenkinsfile.</div>
+          <div class="check">You have Docker Hub credentials or AWS ECR access.</div>
+        </div>
+      </section>
+
+      <section class="section" id="eks">
+        <div class="section-head"><div class="icon">03</div><div><div class="step-kicker">Cluster setup</div><h2>Create or Confirm the EKS Cluster</h2><p>If you already have an EKS cluster, verify it. If not, create one with eksctl or AWS Console. For learning, eksctl is the fastest path.</p></div></div>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Create simple EKS cluster with eksctl</span><button class="copy" type="button">Copy</button></div><pre><code>eksctl create cluster \
+  --name jenkins-eks-demo \
+  --region eu-central-1 \
+  --nodegroup-name demo-nodes \
+  --node-type t3.medium \
+  --nodes 2 \
+  --nodes-min 1 \
+  --nodes-max 3 \
+  --managed</code></pre></div>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Verify cluster locally</span><button class="copy" type="button">Copy</button></div><pre><code>aws eks update-kubeconfig --region eu-central-1 --name jenkins-eks-demo
+kubectl get nodes
+kubectl get pods -A</code></pre></div>
+        <div class="callout"><strong>Important:</strong> if <code class="inline">kubectl get nodes</code> does not work manually, it will not work in Jenkins. Fix cluster access first.</div>
+      </section>
+
+      <section class="section" id="iam">
+        <div class="section-head"><div class="icon">04</div><div><div class="step-kicker">Authentication and authorization</div><h2>Give Jenkins AWS and EKS Access</h2><p>Jenkins needs AWS permissions to describe the EKS cluster and to push images if you use ECR. It also needs Kubernetes access inside the EKS cluster.</p></div></div>
+        <h3>Recommended demo IAM user</h3>
+        <p>Create an IAM user or role named something like <code class="inline">jenkins-deployer</code>. For a learning demo, you can use broader permissions, then reduce them later.</p>
+        <div class="cards">
+          <div class="card"><h3>AWS permissions</h3><p>Minimum for kubeconfig: <code class="inline">eks:DescribeCluster</code>. For ECR option, also add ECR push permissions.</p></div>
+          <div class="card"><h3>EKS access</h3><p>Modern EKS access should use <strong>EKS access entries</strong>, not the old <code class="inline">aws-auth</code> ConfigMap.</p></div>
+          <div class="card"><h3>Production note</h3><p>For production, avoid cluster admin. Use namespace-level RBAC and least privilege.</p></div>
+        </div>
+
+        <h3>Create EKS access entry for Jenkins IAM principal</h3>
+        <p>Replace the ARN, cluster name, and region with your real values.</p>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Create access entry</span><button class="copy" type="button">Copy</button></div><pre><code>aws eks create-access-entry \
+  --cluster-name jenkins-eks-demo \
+  --principal-arn arn:aws:iam::123456789012:user/jenkins-deployer \
+  --region eu-central-1</code></pre></div>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Associate cluster admin policy for demo</span><button class="copy" type="button">Copy</button></div><pre><code>aws eks associate-access-policy \
+  --cluster-name jenkins-eks-demo \
+  --principal-arn arn:aws:iam::123456789012:user/jenkins-deployer \
+  --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy \
+  --access-scope type=cluster \
+  --region eu-central-1</code></pre></div>
+        <div class="callout warn"><strong>Learning vs production:</strong> Cluster admin is okay for a demo. For real company work, create limited namespace access.</div>
+      </section>
+
+      <section class="section" id="tools">
+        <div class="section-head"><div class="icon">05</div><div><div class="step-kicker">Jenkins server tools</div><h2>Install kubectl and AWS CLI Inside Jenkins Container</h2><p>The Jenkinsfile will run <code class="inline">aws</code> and <code class="inline">kubectl</code>. That means both tools must exist inside the Jenkins container.</p></div></div>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Enter Jenkins container as root</span><button class="copy" type="button">Copy</button></div><pre><code>docker exec -it -u 0 jenkins bash</code></pre></div>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Install packages</span><button class="copy" type="button">Copy</button></div><pre><code>apt update
+apt install -y curl unzip ca-certificates</code></pre></div>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Install AWS CLI v2</span><button class="copy" type="button">Copy</button></div><pre><code>curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+./aws/install
+aws --version</code></pre></div>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Install kubectl</span><button class="copy" type="button">Copy</button></div><pre><code>curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+kubectl version --client</code></pre></div>
+        <div class="callout"><strong>Rule:</strong> if a command appears in the Jenkinsfile, the Jenkins runtime must have that command installed.</div>
+      </section>
+
+      <section class="section" id="credentials">
+        <div class="section-head"><div class="icon">06</div><div><div class="step-kicker">Jenkins secrets</div><h2>Create Jenkins Credentials</h2><p>Keep using your existing GitHub and Docker Hub credentials. Add AWS credentials for EKS deployment.</p></div></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Credential ID</th><th>Kind</th><th>Username field</th><th>Password field</th><th>Used for</th></tr></thead>
+            <tbody>
+              <tr><td>github-credentials</td><td>Username with password</td><td>GitHub username</td><td>GitHub token</td><td>Commit updated version back to GitHub.</td></tr>
+              <tr><td>docker-hub-repo</td><td>Username with password</td><td>Docker Hub username</td><td>Docker Hub password/token</td><td>Push Docker image to Docker Hub.</td></tr>
+              <tr><td>aws-credentials</td><td>Username with password</td><td>AWS Access Key ID</td><td>AWS Secret Access Key</td><td>Create kubeconfig and deploy to EKS.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout danger"><strong>Never put secrets directly in Jenkinsfile.</strong> Store them in Jenkins Credentials and inject them only during the needed stage.</div>
+      </section>
+
+      <section class="section" id="manual-test">
+        <div class="section-head"><div class="icon">07</div><div><div class="step-kicker">Prove access before automation</div><h2>Manual EKS Connection Test from Jenkins Container</h2><p>Before adding a deploy stage, prove that Jenkins can talk to EKS. This saves hours of debugging.</p></div></div>
+        <p>For safety, do this using Jenkins credentials in a temporary test pipeline if possible. For a quick learning test, you can enter the container and export credentials temporarily, then remove shell history if needed.</p>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Temporary manual test pattern</span><button class="copy" type="button">Copy</button></div><pre><code>export AWS_ACCESS_KEY_ID="YOUR_ACCESS_KEY"
+export AWS_SECRET_ACCESS_KEY="YOUR_SECRET_KEY"
+export AWS_DEFAULT_REGION="eu-central-1"
+
+aws sts get-caller-identity
+aws eks update-kubeconfig --region eu-central-1 --name jenkins-eks-demo
+kubectl get nodes</code></pre></div>
+        <div class="callout success"><strong>Checkpoint:</strong> if Jenkins container can run <code class="inline">kubectl get nodes</code>, then the deploy stage can work.</div>
+      </section>
+
+      <section class="section" id="repo-structure">
+        <div class="section-head"><div class="icon">08</div><div><div class="step-kicker">Repository layout</div><h2>Recommended Repository Structure</h2><p>Keep Kubernetes files in a dedicated folder. This makes your Jenkinsfile clean.</p></div></div>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Project structure</span><button class="copy" type="button">Copy</button></div><pre><code>java-maven-app-master-EKS/
+├── src/
+├── Dockerfile
+├── Jenkinsfile
+├── pom.xml
+└── k8s/
+    ├── namespace.yaml
+    ├── deployment.yaml
+    └── service.yaml</code></pre></div>
+      </section>
+
+      <section class="section" id="manifests">
+        <div class="section-head"><div class="icon">09</div><div><div class="step-kicker">Kubernetes files</div><h2>Create Kubernetes Manifests</h2><p>These are the minimum Kubernetes files needed for this demo: Namespace, Deployment, and Service.</p></div></div>
+
+        <h3>k8s/namespace.yaml</h3>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">namespace.yaml</span><button class="copy" type="button">Copy</button></div><pre><code>apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-app</code></pre></div>
+
+        <h3>k8s/deployment.yaml</h3>
+        <p>The image value is only a starting value. Jenkins will replace it during deployment using <code class="inline">kubectl set image</code>.</p>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">deployment.yaml</span><button class="copy" type="button">Copy</button></div><pre><code>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: java-maven-app
+  namespace: demo-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: java-maven-app
+  template:
+    metadata:
+      labels:
+        app: java-maven-app
+    spec:
+      containers:
+      - name: java-maven-app
+        image: mujuules01/demo-app:latest
+        ports:
+        - containerPort: 8080</code></pre></div>
+
+        <h3>k8s/service.yaml</h3>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">service.yaml</span><button class="copy" type="button">Copy</button></div><pre><code>apiVersion: v1
+kind: Service
+metadata:
+  name: java-maven-app-service
+  namespace: demo-app
+spec:
+  type: LoadBalancer
+  selector:
+    app: java-maven-app
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080</code></pre></div>
+        <div class="callout warn"><strong>Check your app port:</strong> if your Java app runs on a different port, change <code class="inline">containerPort</code> and <code class="inline">targetPort</code>.</div>
+      </section>
+
+      <section class="section" id="dockerhub-private">
+        <div class="section-head"><div class="icon">10</div><div><div class="step-kicker">Only if Docker Hub repo is private</div><h2>Create Kubernetes Image Pull Secret</h2><p>If your Docker Hub repository is private, Kubernetes needs credentials to pull the image. If the repo is public, skip this section.</p></div></div>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Create Docker Hub image pull secret</span><button class="copy" type="button">Copy</button></div><pre><code>kubectl create secret docker-registry dockerhub-secret \
+  --docker-username=YOUR_DOCKERHUB_USERNAME \
+  --docker-password=YOUR_DOCKERHUB_TOKEN \
+  --docker-email=YOUR_EMAIL \
+  -n demo-app</code></pre></div>
+        <p>If using a private repo, add this under <code class="inline">spec.template.spec</code> in your Deployment:</p>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">imagePullSecrets snippet</span><button class="copy" type="button">Copy</button></div><pre><code>imagePullSecrets:
+- name: dockerhub-secret</code></pre></div>
+      </section>
+
+      <section class="section" id="jenkinsfile-dockerhub">
+        <div class="section-head"><div class="icon">11</div><div><div class="step-kicker">MVP pipeline</div><h2>Jenkinsfile · Docker Hub to EKS</h2><p>This version keeps your current Docker Hub workflow and adds a deploy stage to EKS.</p></div></div>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Jenkinsfile with EKS deploy stage</span><button class="copy" type="button">Copy</button></div><pre><code>#!/usr/bin/env groovy
+
+pipeline {
+    agent any
+
+    tools {
+        maven 'maven-3.9'
+    }
+
+    environment {
+        DOCKER_REPO = 'mujuules01/demo-app'
+        GITHUB_REPO = 'java-maven-app-master-EKS'
+        GITHUB_REPO_OWNER = 'mjulestek'
+        GIT_BRANCH_TO_PUSH = 'jenkins-jobs'
+
+        AWS_REGION = 'eu-central-1'
+        EKS_CLUSTER_NAME = 'jenkins-eks-demo'
+        K8S_NAMESPACE = 'demo-app'
+        K8S_DEPLOYMENT = 'java-maven-app'
+        K8S_CONTAINER = 'java-maven-app'
+    }
+
+    stages {
+        stage('increment version') {
+            steps {
+                script {
+                    echo 'incrementing the version...'
+                    sh 'mvn build-helper:parse-version versions:set -DnewVersion=\\${parsedVersion.majorVersion}.\\${parsedVersion.minorVersion}.\\${parsedVersion.nextIncrementalVersion} versions:commit'
+
+                    env.IMAGE_TAG = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout', returnStdout: true).trim()
+                    env.DOCKER_IMAGE = "${DOCKER_REPO}:${IMAGE_TAG}"
+
+                    echo "New app version is: ${IMAGE_TAG}"
+                    echo "Docker image will be: ${DOCKER_IMAGE}"
+                }
+            }
+        }
+
+        stage('build app') {
+            steps {
+                script {
+                    echo 'building the application...'
+                    sh 'mvn package'
+                }
+            }
+        }
+
+        stage('build image') {
+            steps {
+                script {
+                    echo 'building the docker image...'
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub-repo', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                        sh 'docker build -t $DOCKER_IMAGE .'
+                        sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                        sh 'docker push $DOCKER_IMAGE'
+                    }
+                }
+            }
+        }
+
+        stage('deploy to EKS') {
+            steps {
+                script {
+                    echo 'deploying application to EKS...'
+                    withCredentials([usernamePassword(credentialsId: 'aws-credentials', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')]) {
+                        sh 'aws sts get-caller-identity'
+                        sh 'aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME --kubeconfig kubeconfig'
+                        sh 'KUBECONFIG=kubeconfig kubectl get nodes'
+                        sh 'KUBECONFIG=kubeconfig kubectl apply -f k8s/namespace.yaml'
+                        sh 'KUBECONFIG=kubeconfig kubectl apply -f k8s/'
+                        sh 'KUBECONFIG=kubeconfig kubectl set image deployment/$K8S_DEPLOYMENT $K8S_CONTAINER=$DOCKER_IMAGE -n $K8S_NAMESPACE'
+                        sh 'KUBECONFIG=kubeconfig kubectl rollout status deployment/$K8S_DEPLOYMENT -n $K8S_NAMESPACE'
+                    }
+                }
+            }
+        }
+
+        stage('commit version update to git repo') {
+            steps {
+                script {
+                    echo 'commit version update to git repo...'
+                    withCredentials([usernamePassword(credentialsId: 'github-credentials', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USER')]) {
+                        sh 'git config --global user.email "jenkins@example.com"'
+                        sh 'git config --global user.name "jenkins"'
+
+                        sh 'git status'
+                        sh 'git branch'
+
+                        sh 'git remote set-url origin https://$GITHUB_USER:$GITHUB_TOKEN@github.com/$GITHUB_REPO_OWNER/$GITHUB_REPO.git'
+                        sh 'git remote -v'
+
+                        sh 'git add .'
+                        sh 'git commit -m "jenkins increment version [skip ci]" || true'
+                        sh 'git push origin HEAD:$GIT_BRANCH_TO_PUSH'
+                    }
+                }
+            }
+        }
+    }
+}</code></pre></div>
+      </section>
+
+      <section class="section" id="ecr-option">
+        <div class="section-head"><div class="icon">12</div><div><div class="step-kicker">More AWS-native option</div><h2>Optional: Use AWS ECR Instead of Docker Hub</h2><p>ECR is the more AWS-native registry for EKS. Use this after your Docker Hub version works.</p></div></div>
+        <h3>Create ECR repository</h3>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Create ECR repo</span><button class="copy" type="button">Copy</button></div><pre><code>aws ecr create-repository \
+  --repository-name demo-app \
+  --region eu-central-1</code></pre></div>
+        <h3>ECR Jenkinsfile idea</h3>
+        <p>Replace the Docker Hub login/push with AWS ECR login/push.</p>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">ECR build image stage pattern</span><button class="copy" type="button">Copy</button></div><pre><code>environment {
+    AWS_REGION = 'eu-central-1'
+    AWS_ACCOUNT_ID = '123456789012'
+    ECR_REPO = 'demo-app'
+    ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+}
+
+stage('build and push image to ECR') {
+    steps {
+        script {
+            env.DOCKER_IMAGE = "${ECR_REGISTRY}/${ECR_REPO}:${IMAGE_TAG}"
+
+            withCredentials([usernamePassword(credentialsId: 'aws-credentials', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')]) {
+                sh 'aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY'
+                sh 'docker build -t $DOCKER_IMAGE .'
+                sh 'docker push $DOCKER_IMAGE'
+            }
+        }
+    }
+}</code></pre></div>
+        <div class="callout"><strong>ECR pull rule:</strong> EKS worker nodes need permission to pull from ECR. Managed node groups commonly have this, but verify the node IAM role has ECR read permissions.</div>
+      </section>
+
+      <section class="section" id="test">
+        <div class="section-head"><div class="icon">13</div><div><div class="step-kicker">End-to-end validation</div><h2>Test the Deployment Flow</h2><p>Push a change and watch Jenkins deploy to EKS.</p></div></div>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Local test push</span><button class="copy" type="button">Copy</button></div><pre><code>git checkout jenkins-jobs
+git pull --rebase origin jenkins-jobs
+
+git add .
+git commit -m "deploy app to EKS from Jenkins"
+git push origin jenkins-jobs</code></pre></div>
+        <div class="callout success"><strong>Expected Jenkins stages:</strong> increment version → build app → build image → deploy to EKS → commit version update.</div>
+      </section>
+
+      <section class="section" id="verify">
+        <div class="section-head"><div class="icon">14</div><div><div class="step-kicker">Kubernetes checks</div><h2>Verify the Application in EKS</h2><p>After Jenkins finishes, confirm Kubernetes rollout and service exposure.</p></div></div>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Verify resources</span><button class="copy" type="button">Copy</button></div><pre><code>kubectl get ns
+kubectl get deploy -n demo-app
+kubectl get pods -n demo-app
+kubectl get svc -n demo-app</code></pre></div>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Describe failing pod if needed</span><button class="copy" type="button">Copy</button></div><pre><code>kubectl describe pod POD_NAME -n demo-app
+kubectl logs POD_NAME -n demo-app</code></pre></div>
+        <div class="callout"><strong>LoadBalancer note:</strong> the external address can take a few minutes to appear.</div>
+      </section>
+
+      <section class="section" id="troubleshooting">
+        <div class="section-head"><div class="icon">15</div><div><div class="step-kicker">Fix fast</div><h2>Troubleshooting</h2><p>Most failures happen in authentication, image pull, or mismatched deployment/container names.</p></div></div>
+        <div class="cards">
+          <div class="card">
+            <h3>aws command not found</h3>
+            <p>AWS CLI is not installed inside Jenkins container.</p>
+            <div class="cmd"><div class="cmd-head"><span class="cmd-label">Check</span><button class="copy" type="button">Copy</button></div><pre><code>docker exec -it -u 0 jenkins bash
+aws --version</code></pre></div>
+          </div>
+          <div class="card">
+            <h3>kubectl command not found</h3>
+            <p>kubectl is not installed inside Jenkins container.</p>
+            <div class="cmd"><div class="cmd-head"><span class="cmd-label">Check</span><button class="copy" type="button">Copy</button></div><pre><code>kubectl version --client</code></pre></div>
+          </div>
+          <div class="card">
+            <h3>Unauthorized from kubectl</h3>
+            <p>Jenkins AWS identity can describe the cluster but is not authorized inside Kubernetes. Configure EKS access entry.</p>
+          </div>
+          <div class="card">
+            <h3>ImagePullBackOff</h3>
+            <p>Kubernetes cannot pull the image. Check image name, tag, registry credentials, Docker Hub private secret, or ECR node role permissions.</p>
+          </div>
+          <div class="card">
+            <h3>Deployment not found</h3>
+            <p>Your <code class="inline">K8S_DEPLOYMENT</code> value does not match the Deployment metadata name.</p>
+          </div>
+          <div class="card">
+            <h3>Container not found</h3>
+            <p>Your <code class="inline">K8S_CONTAINER</code> value does not match the container name inside deployment.yaml.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="cleanup">
+        <div class="section-head"><div class="icon">16</div><div><div class="step-kicker">Avoid AWS costs</div><h2>Cleanup Commands</h2><p>When the demo is finished, delete resources you no longer need.</p></div></div>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Delete app resources only</span><button class="copy" type="button">Copy</button></div><pre><code>kubectl delete namespace demo-app</code></pre></div>
+        <div class="cmd"><div class="cmd-head"><span class="cmd-label">Delete EKS cluster if created by eksctl</span><button class="copy" type="button">Copy</button></div><pre><code>eksctl delete cluster --name jenkins-eks-demo --region eu-central-1</code></pre></div>
+        <div class="callout danger"><strong>Cost warning:</strong> EKS clusters, worker nodes, and LoadBalancers can cost money while running.</div>
+      </section>
+
+      <section class="section" id="rules">
+        <div class="section-head"><div class="icon">17</div><div><div class="step-kicker">Senior rules</div><h2>Final Rules of Thumb</h2><p>These rules make the setup easier to debug and explain.</p></div></div>
+        <div class="checks">
+          <div class="check">First make deployment work manually with kubectl, then automate it in Jenkins.</div>
+          <div class="check">If Jenkinsfile uses a command, install that command inside Jenkins container.</div>
+          <div class="check">Use AWS CLI to generate kubeconfig dynamically during the pipeline.</div>
+          <div class="check">Do not store kubeconfig or AWS secrets directly in GitHub.</div>
+          <div class="check">Make Maven version, Docker tag, and Kubernetes deployed image match.</div>
+          <div class="check">Use Docker Hub first for learning, then move to ECR for AWS-native deployment.</div>
+          <div class="check">When using ECR, verify EKS node IAM role can pull images.</div>
+          <div class="check">Use rollout status as the pipeline gate before calling deployment successful.</div>
+          <div class="check">Use [skip ci] or Ignore Committer Strategy to avoid Jenkins commit loops.</div>
+        </div>
+        <div class="footer">
+          <strong>Final demo architecture:</strong><br />
+          GitHub → Jenkins Multibranch Pipeline → Docker Registry → AWS EKS → Kubernetes Deployment Rollout
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.copy').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const block = button.closest('.cmd');
+      const code = block ? block.querySelector('pre code') : null;
+      if (!code) return;
+      try {
+        await navigator.clipboard.writeText(code.innerText);
+        const original = button.innerText;
+        button.innerText = 'Copied';
+        setTimeout(() => button.innerText = original, 1200);
+      } catch (error) {
+        button.innerText = 'Copy failed';
+        setTimeout(() => button.innerText = 'Copy', 1200);
+      }
+    });
+  });
+</script>
+</body>
+</html>
