@@ -19,6 +19,7 @@ pipeline {
             steps {
                 script {
                     echo 'incrementing the version...'
+
                     sh 'mvn build-helper:parse-version versions:set -DnewVersion=\\${parsedVersion.majorVersion}.\\${parsedVersion.minorVersion}.\\${parsedVersion.nextIncrementalVersion} versions:commit'
 
                     env.IMAGE_TAG = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout', returnStdout: true).trim()
@@ -34,7 +35,7 @@ pipeline {
             steps {
                 script {
                     echo 'building the application...'
-                    sh 'mvn package'
+                    sh 'mvn clean package'
                 }
             }
         }
@@ -43,6 +44,7 @@ pipeline {
             steps {
                 script {
                     echo 'building the docker image...'
+
                     withCredentials([usernamePassword(credentialsId: 'docker-hub-repo', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
                         sh 'docker build -t $DOCKER_IMAGE .'
                         sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
@@ -53,9 +55,30 @@ pipeline {
         }
 
         stage('deploy') {
+            environment {
+                AWS_ACCESS_KEY_ID = credentials('jenkins_aws_access_key_id')
+                AWS_SECRET_ACCESS_KEY = credentials('jenkins_aws_secret_access_key')
+                AWS_REGION = 'eu-central-1'
+                EKS_CLUSTER_NAME = 'jennifer-demo-cluster'
+                APP_NAME = 'java-maven-app'
+                AWS_PAGER = ''
+            }
+
             steps {
                 script {
-                    echo 'deploying the application...'
+                    echo 'deploying docker image...'
+
+                    env.IMAGE_NAME = "${DOCKER_IMAGE}"
+
+                    sh 'aws sts get-caller-identity'
+                    sh 'aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME'
+
+                    sh 'kubectl get nodes'
+
+                    sh 'envsubst < kubernetes/deployment.yaml | kubectl apply -f -'
+                    sh 'envsubst < kubernetes/service.yaml | kubectl apply -f -'
+
+                    sh 'kubectl rollout status deployment/$APP_NAME --timeout=180s'
                 }
             }
         }
@@ -64,6 +87,7 @@ pipeline {
             steps {
                 script {
                     echo 'commit version update to git repo...'
+
                     withCredentials([usernamePassword(credentialsId: 'github-credentials', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USER')]) {
                         sh 'git config --global user.email "jenkins@example.com"'
                         sh 'git config --global user.name "jenkins"'
@@ -81,6 +105,5 @@ pipeline {
                 }
             }
         }
-
     }
 }
