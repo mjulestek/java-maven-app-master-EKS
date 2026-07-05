@@ -21,8 +21,6 @@ pipeline {
         AWS_REGION = 'eu-central-1'
         EKS_CLUSTER_NAME = 'jennifer-demo-cluster'
         AWS_PAGER = ''
-
-        SKIP_BUILD = 'false'
     }
 
     stages {
@@ -36,22 +34,17 @@ pipeline {
                     echo "Last commit message is: ${commitMessage}"
 
                     if (commitMessage.contains('[skip ci]')) {
-                        echo 'Commit contains [skip ci]. Skipping pipeline to stop loop.'
-                        env.SKIP_BUILD = 'true'
-                    } else {
-                        echo 'No [skip ci] found. Continuing pipeline.'
+                        echo 'Commit contains [skip ci]. Stopping pipeline to avoid loop.'
+                        currentBuild.result = 'SUCCESS'
+                        error('Stopping pipeline because this is a Jenkins version commit.')
                     }
+
+                    echo 'No [skip ci] found. Continuing pipeline.'
                 }
             }
         }
 
         stage('increment version') {
-            when {
-                expression {
-                    env.SKIP_BUILD != 'true'
-                }
-            }
-
             steps {
                 script {
                     echo 'incrementing the version...'
@@ -69,12 +62,6 @@ pipeline {
         }
 
         stage('build app') {
-            when {
-                expression {
-                    env.SKIP_BUILD != 'true'
-                }
-            }
-
             steps {
                 script {
                     echo 'building the application...'
@@ -84,12 +71,6 @@ pipeline {
         }
 
         stage('build image') {
-            when {
-                expression {
-                    env.SKIP_BUILD != 'true'
-                }
-            }
-
             steps {
                 script {
                     echo 'building the docker image...'
@@ -104,12 +85,6 @@ pipeline {
         }
 
         stage('deploy') {
-            when {
-                expression {
-                    env.SKIP_BUILD != 'true'
-                }
-            }
-
             environment {
                 AWS_ACCESS_KEY_ID = credentials('jenkins-aws-access-key-id')
                 AWS_SECRET_ACCESS_KEY = credentials('jenkins-aws-secret-access-key')
@@ -133,12 +108,6 @@ pipeline {
         }
 
         stage('commit version update to git repo') {
-            when {
-                expression {
-                    env.SKIP_BUILD != 'true'
-                }
-            }
-
             steps {
                 script {
                     echo 'commit version update to git repo...'
