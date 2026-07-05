@@ -56,8 +56,8 @@ pipeline {
 
         stage('deploy') {
             environment {
-                AWS_ACCESS_KEY_ID = credentials('jenkins_aws_access_key_id')
-                AWS_SECRET_ACCESS_KEY = credentials('jenkins_aws_secret_access_key')
+                AWS_ACCESS_KEY_ID = credentials('jenkins-aws-access-key_id')
+                AWS_SECRET_ACCESS_KEY = credentials('jenkins-aws-secret-access-key')
                 AWS_REGION = 'eu-central-1'
                 EKS_CLUSTER_NAME = 'jennifer-demo-cluster'
                 APP_NAME = 'java-maven-app'
