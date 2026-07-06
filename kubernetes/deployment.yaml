@@ -14,8 +14,6 @@ spec:
       labels:
         app: $APP_NAME
     spec:
-      imagePullSecrets:
-      - name: my-registry-key
       containers:
       - name: $APP_NAME
         image: $IMAGE_NAME

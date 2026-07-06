@@ -12,15 +12,20 @@ pipeline {
     }
 
     environment {
-        DOCKER_REPO = 'mujuules01/demo-app'
+        AWS_ACCOUNT_ID = '596517178096'
+        AWS_REGION = 'eu-central-1'
+        EKS_CLUSTER_NAME = 'jennifer-demo-cluster'
+
+        ECR_REPO_NAME = 'java-maven-app'
+        ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        ECR_REPO = "${ECR_REGISTRY}/${ECR_REPO_NAME}"
+
+        APP_NAME = 'java-maven-app'
+        AWS_PAGER = ''
+
         GITHUB_REPO = 'java-maven-app-master-EKS'
         GITHUB_REPO_OWNER = 'mjulestek'
         GIT_BRANCH_TO_PUSH = 'jenkins-jobs'
-
-        APP_NAME = 'java-maven-app'
-        AWS_REGION = 'eu-central-1'
-        EKS_CLUSTER_NAME = 'jennifer-demo-cluster'
-        AWS_PAGER = ''
     }
 
     stages {
@@ -52,11 +57,10 @@ pipeline {
                     sh 'mvn build-helper:parse-version versions:set -DnewVersion=\\${parsedVersion.majorVersion}.\\${parsedVersion.minorVersion}.\\${parsedVersion.nextIncrementalVersion} versions:commit'
 
                     env.IMAGE_TAG = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout', returnStdout: true).trim()
-                    env.DOCKER_IMAGE = "${DOCKER_REPO}:${IMAGE_TAG}"
-                    env.IMAGE_NAME = "${DOCKER_IMAGE}"
+                    env.IMAGE_NAME = "${ECR_REPO}:${IMAGE_TAG}"
 
                     echo "New app version is: ${IMAGE_TAG}"
-                    echo "Docker image will be: ${DOCKER_IMAGE}"
+                    echo "Docker image will be: ${IMAGE_NAME}"
                 }
             }
         }
@@ -70,16 +74,21 @@ pipeline {
             }
         }
 
-        stage('build image') {
+        stage('build and push image to ECR') {
+            environment {
+                AWS_ACCESS_KEY_ID = credentials('jenkins-aws-access-key-id')
+                AWS_SECRET_ACCESS_KEY = credentials('jenkins-aws-secret-access-key')
+            }
+
             steps {
                 script {
-                    echo 'building the docker image...'
+                    echo 'building docker image and pushing to AWS ECR...'
 
-                    withCredentials([usernamePassword(credentialsId: 'docker-hub-repo', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
-                        sh 'docker build -t $DOCKER_IMAGE .'
-                        sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
-                        sh 'docker push $DOCKER_IMAGE'
-                    }
+                    sh 'aws sts get-caller-identity'
+                    sh 'aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY'
+
+                    sh 'docker build -t $IMAGE_NAME .'
+                    sh 'docker push $IMAGE_NAME'
                 }
             }
         }
@@ -92,7 +101,7 @@ pipeline {
 
             steps {
                 script {
-                    echo 'deploying docker image...'
+                    echo 'deploying docker image to EKS...'
 
                     sh 'aws sts get-caller-identity'
                     sh 'aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME'
@@ -107,10 +116,10 @@ pipeline {
             }
         }
 
-        stage('commit version update to git repo') {
+        stage('commit version update') {
             steps {
                 script {
-                    echo 'commit version update to git repo...'
+                    echo 'committing version update to GitHub...'
 
                     withCredentials([usernamePassword(credentialsId: 'github-credentials', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USER')]) {
                         sh 'git config --global user.email "jenkins@example.com"'
