@@ -1,3 +1,8 @@
+<<<<<<< HEAD
 {
     "java.configuration.updateBuildConfiguration": "interactive"
+=======
+{
+    "java.configuration.updateBuildConfiguration": "interactive"
+>>>>>>> 92ce207 (update app version tag)
 }
