@@ -119,7 +119,7 @@ pipeline {
         stage('commit version update') {
             steps {
                 script {
-                    echo 'committing version update to GitHub...'
+                    echo 'committing version update to GitHub repository...'
 
                     withCredentials([usernamePassword(credentialsId: 'github-credentials', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USER')]) {
                         sh 'git config --global user.email "jenkins@example.com"'
