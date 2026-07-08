@@ -1,0 +1,19 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: jennifer-demo-cluster
+  region: eu-central-1
+  version: "1.30"
+
+managedNodeGroups:
+  - name: jennifer-demo-nodes
+    instanceType: t3.medium
+    desiredCapacity: 2
+    minSize: 1
+    maxSize: 3
+    volumeSize: 20
+    labels:
+      role: worker
+    tags:
+      nodegroup-role: worker
